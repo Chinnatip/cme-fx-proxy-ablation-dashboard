@@ -5,6 +5,11 @@ const state = {
   mode: null,
   lookback: null,
   holding: null,
+  currentCurve: [],
+  signalHoverIndex: null,
+  exposureHoverIndex: null,
+  exposureHoverAsset: null,
+  exposureAssets: [],
 };
 
 const fmtPct = (value) => `${(Number(value) * 100).toFixed(2)}%`;
@@ -18,6 +23,7 @@ function init() {
   renderTabs();
   renderSelectors();
   renderAll();
+  attachChartInteractions();
 }
 
 function currentRun() {
@@ -114,6 +120,11 @@ function renderAll() {
   const run = currentRun();
   const candidate = findCandidate() || run.candidates[0];
   const curve = run.curves[candidate.id] || [];
+  state.currentCurve = curve;
+  state.signalHoverIndex = null;
+  state.exposureHoverIndex = null;
+  state.exposureHoverAsset = null;
+  hideTooltip();
 
   document.getElementById("chartTitle").textContent = `${run.label}`;
   document.getElementById("candidateChip").textContent = `${modeLabel(candidate.score_mode)} | J=${candidate.lookback} K=${candidate.holding_period}`;
@@ -128,6 +139,52 @@ function renderAll() {
   drawEquity(curve, candidate);
   drawSignalTape(curve);
   drawExposureMap(curve);
+}
+
+function attachChartInteractions() {
+  const signalCanvas = document.getElementById("signalCanvas");
+  const exposureCanvas = document.getElementById("exposureCanvas");
+
+  signalCanvas.addEventListener("mousemove", (event) => {
+    const curve = state.currentCurve;
+    const plot = signalPlot(signalCanvas, curve);
+    const idx = eventToIndex(event, signalCanvas, curve, plot.pad);
+    if (idx === null) {
+      hideTooltip();
+      return;
+    }
+    state.signalHoverIndex = idx;
+    drawSignalTape(curve);
+    showSignalTooltip(event, curve, idx);
+  });
+
+  signalCanvas.addEventListener("mouseleave", () => {
+    state.signalHoverIndex = null;
+    hideTooltip();
+    drawSignalTape(state.currentCurve);
+  });
+
+  exposureCanvas.addEventListener("mousemove", (event) => {
+    const curve = state.currentCurve;
+    const plot = exposurePlot(exposureCanvas, curve);
+    const idx = eventToIndex(event, exposureCanvas, curve, plot.pad);
+    const asset = eventToAsset(event, exposureCanvas, plot);
+    if (idx === null || !asset) {
+      hideTooltip();
+      return;
+    }
+    state.exposureHoverIndex = idx;
+    state.exposureHoverAsset = asset;
+    drawExposureMap(curve);
+    showExposureTooltip(event, curve, idx, asset);
+  });
+
+  exposureCanvas.addEventListener("mouseleave", () => {
+    state.exposureHoverIndex = null;
+    state.exposureHoverAsset = null;
+    hideTooltip();
+    drawExposureMap(state.currentCurve);
+  });
 }
 
 function renderVerdict(candidate, run) {
@@ -366,13 +423,7 @@ function drawSignalTape(curve) {
     return;
   }
 
-  const pad = { left: 64, right: 28, top: 26, bottom: 72 };
-  const returns = curve.map((point) => Number(point.net_return || 0));
-  const maxAbs = Math.max(...returns.map((value) => Math.abs(value)), 0.01);
-  const x = (idx) => pad.left + (idx / Math.max(curve.length - 1, 1)) * (width - pad.left - pad.right);
-  const zeroY = pad.top + (height - pad.top - pad.bottom) / 2;
-  const y = (value) => zeroY - (value / maxAbs) * ((height - pad.top - pad.bottom) / 2) * 0.88;
-  const barWidth = Math.max(3, Math.min(18, (width - pad.left - pad.right) / Math.max(curve.length, 1) * 0.56));
+  const { pad, maxAbs, x, zeroY, y, barWidth } = signalPlot(canvas, curve);
 
   drawSignalGrid(ctx, width, height, pad, maxAbs, zeroY, y);
 
@@ -394,6 +445,10 @@ function drawSignalTape(curve) {
     }
   });
 
+  if (state.signalHoverIndex !== null) {
+    drawSignalHover(ctx, curve, state.signalHoverIndex, x, y, zeroY, barWidth, height, pad);
+  }
+
   drawPositionLabels(ctx, curve, x, height, pad);
 
   const latest = curve[curve.length - 1];
@@ -405,6 +460,43 @@ function drawSignalTape(curve) {
   ctx.textAlign = "right";
   ctx.fillText(String(curve[curve.length - 1].date).slice(0, 10), width - pad.right, height - 20);
   ctx.textAlign = "left";
+}
+
+function signalPlot(canvas, curve) {
+  const width = canvas.width;
+  const height = canvas.height;
+  const pad = { left: 64, right: 28, top: 26, bottom: 72 };
+  const returns = curve.map((point) => Number(point.net_return || 0));
+  const maxAbs = Math.max(...returns.map((value) => Math.abs(value)), 0.01);
+  const x = (idx) => pad.left + (idx / Math.max(curve.length - 1, 1)) * (width - pad.left - pad.right);
+  const zeroY = pad.top + (height - pad.top - pad.bottom) / 2;
+  const y = (value) => zeroY - (value / maxAbs) * ((height - pad.top - pad.bottom) / 2) * 0.88;
+  const barWidth = Math.max(3, Math.min(18, (width - pad.left - pad.right) / Math.max(curve.length, 1) * 0.56));
+  return { pad, maxAbs, x, zeroY, y, barWidth };
+}
+
+function drawSignalHover(ctx, curve, idx, x, y, zeroY, barWidth, height, pad) {
+  const point = curve[idx];
+  const value = Number(point.net_return || 0);
+  const px = x(idx);
+  const py = y(value);
+  ctx.save();
+  ctx.strokeStyle = "rgba(99, 230, 255, 0.82)";
+  ctx.lineWidth = 2;
+  ctx.setLineDash([5, 5]);
+  ctx.beginPath();
+  ctx.moveTo(px, pad.top);
+  ctx.lineTo(px, height - pad.bottom);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.strokeStyle = "#eef5ff";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(px - barWidth / 2 - 3, Math.min(py, zeroY) - 3, barWidth + 6, Math.max(8, Math.abs(zeroY - py) + 6));
+  ctx.beginPath();
+  ctx.arc(px, zeroY, 7, 0, Math.PI * 2);
+  ctx.fillStyle = "#63e6ff";
+  ctx.fill();
+  ctx.restore();
 }
 
 function drawSignalGrid(ctx, width, height, pad, maxAbs, zeroY, y) {
@@ -472,11 +564,8 @@ function drawExposureMap(curve) {
   const assets = Array.from(
     new Set(curve.flatMap((point) => [point.top_assets, point.bottom_assets].filter(Boolean))),
   ).sort();
-  const pad = { left: 72, right: 28, top: 34, bottom: 54 };
-  const plotWidth = width - pad.left - pad.right;
-  const plotHeight = height - pad.top - pad.bottom;
-  const cellWidth = Math.max(2, plotWidth / curve.length);
-  const rowHeight = plotHeight / Math.max(assets.length, 1);
+  state.exposureAssets = assets;
+  const { pad, cellWidth, rowHeight } = exposurePlot(canvas, curve, assets);
 
   ctx.font = "15px 'Noto Sans Thai'";
   ctx.fillStyle = "#8190a4";
@@ -498,6 +587,9 @@ function drawExposureMap(curve) {
   });
 
   drawExposureGrid(ctx, width, height, pad, curve, assets, cellWidth, rowHeight);
+  if (state.exposureHoverIndex !== null && state.exposureHoverAsset) {
+    drawExposureHover(ctx, width, height, pad, assets, cellWidth, rowHeight);
+  }
 
   const longCounts = {};
   const shortCounts = {};
@@ -519,6 +611,32 @@ function drawExposureMap(curve) {
   ctx.textAlign = "right";
   ctx.fillText(String(curve[curve.length - 1].date).slice(0, 10), width - pad.right, height - 18);
   ctx.textAlign = "left";
+}
+
+function exposurePlot(canvas, curve, assets = state.exposureAssets) {
+  const width = canvas.width;
+  const height = canvas.height;
+  const pad = { left: 72, right: 28, top: 34, bottom: 54 };
+  const plotWidth = width - pad.left - pad.right;
+  const plotHeight = height - pad.top - pad.bottom;
+  const cellWidth = Math.max(2, plotWidth / Math.max(curve.length, 1));
+  const rowHeight = plotHeight / Math.max(assets.length, 1);
+  return { pad, cellWidth, rowHeight, assets };
+}
+
+function drawExposureHover(ctx, width, height, pad, assets, cellWidth, rowHeight) {
+  const idx = state.exposureHoverIndex;
+  const rowIdx = assets.indexOf(state.exposureHoverAsset);
+  if (idx < 0 || rowIdx < 0) return;
+  const x = pad.left + idx * cellWidth;
+  const y = pad.top + rowIdx * rowHeight;
+  ctx.save();
+  ctx.strokeStyle = "rgba(99, 230, 255, 0.9)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x, pad.top, Math.max(2, cellWidth), height - pad.top - pad.bottom);
+  ctx.strokeStyle = "rgba(238, 245, 255, 0.72)";
+  ctx.strokeRect(pad.left, y + 2, width - pad.left - pad.right, Math.max(2, rowHeight - 4));
+  ctx.restore();
 }
 
 function exposureColor(exposure) {
@@ -554,6 +672,94 @@ function drawExposureGrid(ctx, width, height, pad, curve, assets, cellWidth, row
 function topCountLabel(counts) {
   const [asset, count] = Object.entries(counts).sort((a, b) => b[1] - a[1])[0] || ["-", 0];
   return `${asset} (${count})`;
+}
+
+function eventToIndex(event, canvas, curve, pad) {
+  if (!curve.length) return null;
+  const point = canvasPoint(event, canvas);
+  if (point.x < pad.left || point.x > canvas.width - pad.right) return null;
+  const ratio = (point.x - pad.left) / Math.max(canvas.width - pad.left - pad.right, 1);
+  const idx = Math.round(ratio * Math.max(curve.length - 1, 1));
+  return Math.max(0, Math.min(curve.length - 1, idx));
+}
+
+function eventToAsset(event, canvas, plot) {
+  const point = canvasPoint(event, canvas);
+  const { pad, rowHeight, assets } = plot;
+  if (point.y < pad.top || point.y > canvas.height - pad.bottom) return null;
+  const rowIdx = Math.floor((point.y - pad.top) / Math.max(rowHeight, 1));
+  return assets[Math.max(0, Math.min(assets.length - 1, rowIdx))] || null;
+}
+
+function canvasPoint(event, canvas) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: ((event.clientX - rect.left) / Math.max(rect.width, 1)) * canvas.width,
+    y: ((event.clientY - rect.top) / Math.max(rect.height, 1)) * canvas.height,
+  };
+}
+
+function showSignalTooltip(event, curve, idx) {
+  const point = curve[idx];
+  const previous = curve[idx - 1];
+  const changed =
+    !previous || previous.top_assets !== point.top_assets || previous.bottom_assets !== point.bottom_assets;
+  const previousText = previous
+    ? `ก่อนหน้า: Long ${previous.top_assets} / Short ${previous.bottom_assets}`
+    : "ก่อนหน้า: เริ่มรอบแรก";
+  const actionText = changed ? "มีการปรับพอร์ต" : "ถือคู่เดิมต่อ";
+  showTooltip(
+    event,
+    `<strong>${actionText}</strong>
+     <span>Rebalance #${idx + 1} | ${String(point.date).slice(0, 10)}</span>
+     <span>${previousText}</span>
+     <span>หลังปรับ: <b>Long ${point.top_assets}</b> / <b>Short ${point.bottom_assets}</b></span>
+     <span>น้ำหนักโดยประมาณ: Long +50% / Short -50%</span>
+     <span>Net return รอบนี้: <b class="${Number(point.net_return) >= 0 ? "good" : "bad"}">${fmtPct(point.net_return)}</b></span>
+     <span>Equity หลังจบรอบ: ${fmtNum(point.equity)}x</span>`,
+  );
+}
+
+function showExposureTooltip(event, curve, idx, asset) {
+  const point = curve[idx];
+  const exposure = point.top_assets === asset ? 0.5 : point.bottom_assets === asset ? -0.5 : 0;
+  const role = exposure > 0 ? "Long winner" : exposure < 0 ? "Short loser" : "ไม่ได้ถือ";
+  showTooltip(
+    event,
+    `<strong>${asset}: ${role}</strong>
+     <span>Rebalance #${idx + 1} | ${String(point.date).slice(0, 10)}</span>
+     <span>พอร์ตทั้งรอบ: Long ${point.top_assets} / Short ${point.bottom_assets}</span>
+     <span>Exposure ของ ${asset}: <b class="${exposure > 0 ? "good" : exposure < 0 ? "bad" : ""}">${fmtPct(exposure)}</b></span>
+     <span>Net return รอบนี้: <b class="${Number(point.net_return) >= 0 ? "good" : "bad"}">${fmtPct(point.net_return)}</b></span>
+     <span>Equity หลังจบรอบ: ${fmtNum(point.equity)}x</span>`,
+  );
+}
+
+function showTooltip(event, html) {
+  const tooltip = document.getElementById("chartTooltip");
+  const panel = document.getElementById("equity");
+  const panelRect = panel.getBoundingClientRect();
+  tooltip.innerHTML = html;
+  tooltip.classList.add("visible");
+
+  const tooltipRect = tooltip.getBoundingClientRect();
+  const offset = 18;
+  let left = event.clientX - panelRect.left + offset;
+  let top = event.clientY - panelRect.top + offset;
+  if (left + tooltipRect.width > panelRect.width - 12) {
+    left = event.clientX - panelRect.left - tooltipRect.width - offset;
+  }
+  if (top + tooltipRect.height > panelRect.height - 12) {
+    top = event.clientY - panelRect.top - tooltipRect.height - offset;
+  }
+  tooltip.style.left = `${Math.max(12, left)}px`;
+  tooltip.style.top = `${Math.max(12, top)}px`;
+}
+
+function hideTooltip() {
+  const tooltip = document.getElementById("chartTooltip");
+  if (!tooltip) return;
+  tooltip.classList.remove("visible");
 }
 
 function drawGrid(ctx, width, height, pad, yMin, yMax, y) {
