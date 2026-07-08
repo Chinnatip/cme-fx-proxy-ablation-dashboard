@@ -127,6 +127,7 @@ function renderAll() {
   renderBestTable();
   drawEquity(curve, candidate);
   drawSignalTape(curve);
+  drawExposureMap(curve);
 }
 
 function renderVerdict(candidate, run) {
@@ -449,6 +450,110 @@ function drawPositionLabels(ctx, curve, x, height, pad) {
   });
 
   ctx.textAlign = "left";
+}
+
+function drawExposureMap(curve) {
+  const canvas = document.getElementById("exposureCanvas");
+  const ctx = canvas.getContext("2d");
+  const width = canvas.width;
+  const height = canvas.height;
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = "#07101b";
+  ctx.fillRect(0, 0, width, height);
+
+  const chip = document.getElementById("exposureChip");
+  if (!curve.length) {
+    ctx.fillStyle = "#8190a4";
+    ctx.fillText("No exposure data", 80, 80);
+    chip.textContent = "No exposure data";
+    return;
+  }
+
+  const assets = Array.from(
+    new Set(curve.flatMap((point) => [point.top_assets, point.bottom_assets].filter(Boolean))),
+  ).sort();
+  const pad = { left: 72, right: 28, top: 34, bottom: 54 };
+  const plotWidth = width - pad.left - pad.right;
+  const plotHeight = height - pad.top - pad.bottom;
+  const cellWidth = Math.max(2, plotWidth / curve.length);
+  const rowHeight = plotHeight / Math.max(assets.length, 1);
+
+  ctx.font = "15px 'Noto Sans Thai'";
+  ctx.fillStyle = "#8190a4";
+  ctx.fillText("Exposure by rebalance period", pad.left, 22);
+
+  assets.forEach((asset, rowIdx) => {
+    const y = pad.top + rowIdx * rowHeight;
+    ctx.fillStyle = "#aebbd0";
+    ctx.textAlign = "right";
+    ctx.fillText(asset, pad.left - 12, y + rowHeight * 0.62);
+    ctx.textAlign = "left";
+
+    curve.forEach((point, idx) => {
+      const exposure = point.top_assets === asset ? 0.5 : point.bottom_assets === asset ? -0.5 : 0;
+      const x = pad.left + idx * cellWidth;
+      ctx.fillStyle = exposureColor(exposure);
+      ctx.fillRect(x, y + 2, Math.max(1, cellWidth + 0.5), Math.max(2, rowHeight - 4));
+    });
+  });
+
+  drawExposureGrid(ctx, width, height, pad, curve, assets, cellWidth, rowHeight);
+
+  const longCounts = {};
+  const shortCounts = {};
+  assets.forEach((asset) => {
+    longCounts[asset] = 0;
+    shortCounts[asset] = 0;
+  });
+  curve.forEach((point) => {
+    if (point.top_assets) longCounts[point.top_assets] = (longCounts[point.top_assets] || 0) + 1;
+    if (point.bottom_assets) shortCounts[point.bottom_assets] = (shortCounts[point.bottom_assets] || 0) + 1;
+  });
+  const mostLong = topCountLabel(longCounts);
+  const mostShort = topCountLabel(shortCounts);
+  chip.textContent = `Long บ่อยสุด ${mostLong} / Short บ่อยสุด ${mostShort}`;
+
+  ctx.fillStyle = "#8190a4";
+  ctx.font = "13px 'Noto Sans Thai'";
+  ctx.fillText(String(curve[0].date).slice(0, 10), pad.left, height - 18);
+  ctx.textAlign = "right";
+  ctx.fillText(String(curve[curve.length - 1].date).slice(0, 10), width - pad.right, height - 18);
+  ctx.textAlign = "left";
+}
+
+function exposureColor(exposure) {
+  if (exposure > 0) return "rgba(32, 214, 159, 0.82)";
+  if (exposure < 0) return "rgba(255, 95, 122, 0.82)";
+  return "rgba(129, 144, 164, 0.12)";
+}
+
+function drawExposureGrid(ctx, width, height, pad, curve, assets, cellWidth, rowHeight) {
+  ctx.strokeStyle = "rgba(166, 184, 208, 0.12)";
+  ctx.lineWidth = 1;
+  assets.forEach((_, idx) => {
+    const y = pad.top + idx * rowHeight;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(width - pad.right, y);
+    ctx.stroke();
+  });
+
+  const step = Math.max(1, Math.ceil(curve.length / 6));
+  ctx.font = "12px 'Noto Sans Thai'";
+  ctx.fillStyle = "#8190a4";
+  for (let idx = 0; idx < curve.length; idx += step) {
+    const x = pad.left + idx * cellWidth;
+    ctx.beginPath();
+    ctx.moveTo(x, pad.top);
+    ctx.lineTo(x, height - pad.bottom);
+    ctx.stroke();
+    ctx.fillText(String(curve[idx].date).slice(5, 10), x + 2, height - pad.bottom + 20);
+  }
+}
+
+function topCountLabel(counts) {
+  const [asset, count] = Object.entries(counts).sort((a, b) => b[1] - a[1])[0] || ["-", 0];
+  return `${asset} (${count})`;
 }
 
 function drawGrid(ctx, width, height, pad, yMin, yMax, y) {

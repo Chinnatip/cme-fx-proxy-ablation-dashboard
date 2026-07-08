@@ -297,7 +297,8 @@ canvas {
   background: #07101b;
 }
 
-.signal-panel {
+.signal-panel,
+.exposure-panel {
   margin-top: 16px;
   padding-top: 16px;
   border-top: 1px solid var(--line);
@@ -315,6 +316,40 @@ canvas {
 
 #signalCanvas {
   border: 1px solid rgba(166, 184, 208, 0.1);
+}
+
+#exposureCanvas {
+  border: 1px solid rgba(166, 184, 208, 0.1);
+}
+
+.legend-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 10px;
+  color: #aebbd0;
+  font-size: 13px;
+}
+
+.legend-box {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 6px;
+  border-radius: 3px;
+  vertical-align: -1px;
+}
+
+.legend-box.long {
+  background: var(--good);
+}
+
+.legend-box.short {
+  background: var(--bad);
+}
+
+.legend-box.flat {
+  background: rgba(129, 144, 164, 0.24);
 }
 
 .signal-note {
