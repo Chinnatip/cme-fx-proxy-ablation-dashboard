@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CME FX Proxy Ablation Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <aside class="rail">
+        <div class="brand">
+          <span class="brand-mark">FX</span>
+          <div>
+            <strong>CME Proxy</strong>
+            <small>Ablation Lab</small>
+          </div>
+        </div>
+        <nav class="rail-nav">
+          <a href="#equity" class="active">Equity</a>
+          <a href="#metrics">Metrics</a>
+          <a href="#matrix">J/K Matrix</a>
+          <a href="#coverage">Coverage</a>
+          <a href="#best">Best Grid</a>
+        </nav>
+        <div class="rail-note">
+          <span>COMMON WINDOW</span>
+          <p>ตัดเหลือช่วงที่ 1H/4H ใช้ได้จริงร่วมกัน: Feb 2024 ถึงข้อมูลล่าสุด</p>
+        </div>
+      </aside>
+
+      <section class="workspace">
+        <header class="hero">
+          <div>
+            <p class="eyebrow">MR/MOM Concept Transfer</p>
+            <h1>Spot vs CME Futures Proxy: Common-Window Ablation</h1>
+            <p class="lede">รอบนี้เทียบ 1H, 4H, 1D และ 1M บนช่วงข้อมูลเดียวกันให้มากที่สุด เพื่อดูว่า J/K scale ไหนพอมี edge โดยไม่เอา daily history ยาว ๆ มาปนกับ intraday</p>
+          </div>
+          <div class="status-card">
+            <span>Current Verdict</span>
+            <strong id="verdictText">Loading</strong>
+            <small id="verdictNote">ใช้ proxy จาก Yahoo CME futures + FX spot</small>
+          </div>
+        </header>
+
+        <section class="kpi-strip" id="metrics"></section>
+
+        <section class="panel controls-panel">
+          <div>
+            <label>Timeframe</label>
+            <div class="tabs" id="timeframeTabs"></div>
+          </div>
+          <div>
+            <label>Mode</label>
+            <select id="modeSelect"></select>
+          </div>
+          <div>
+            <label>Lookback J</label>
+            <select id="jSelect"></select>
+          </div>
+          <div>
+            <label>Holding K</label>
+            <select id="kSelect"></select>
+          </div>
+        </section>
+
+        <section class="grid">
+          <article class="panel chart-panel" id="equity">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Interactive Equity</p>
+                <h2 id="chartTitle">Equity Curve</h2>
+              </div>
+              <span class="chip" id="candidateChip">-</span>
+            </div>
+            <canvas id="equityCanvas" width="1200" height="560"></canvas>
+          </article>
+
+          <article class="panel insight-panel">
+            <p class="eyebrow">อ่านผลเร็ว ๆ</p>
+            <h2 id="insightTitle">Ablation Insight</h2>
+            <p id="insightText"></p>
+            <dl class="detail-list" id="candidateDetails"></dl>
+            <div class="mini-bars" id="returnBars"></div>
+          </article>
+        </section>
+
+        <section class="panel" id="matrix">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">J/K Ablation Matrix</p>
+              <h2 id="matrixTitle">Return / Sharpe grid</h2>
+            </div>
+            <span class="chip">เลือก mode ด้านบนเพื่อเปลี่ยน grid</span>
+          </div>
+          <div class="matrix-wrap" id="matrixWrap"></div>
+        </section>
+
+        <section class="panel warning-panel">
+          <strong>อ่านก่อนตีความ</strong>
+          <p id="sourceWarning"></p>
+        </section>
+
+        <section class="panel" id="coverage">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Data Coverage</p>
+              <h2>Universe และช่วงข้อมูล</h2>
+            </div>
+            <span class="chip">USD per foreign currency</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Asset</th>
+                  <th>Futures</th>
+                  <th>Rows</th>
+                  <th>First</th>
+                  <th>Last</th>
+                  <th>Mean Basis bps</th>
+                </tr>
+              </thead>
+              <tbody id="coverageBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel" id="best">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Best Per Timeframe</p>
+              <h2>ตัวที่ดีที่สุดของแต่ละสเกล</h2>
+            </div>
+            <span class="chip">Rank by Sharpe</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>TF</th>
+                  <th>Mode</th>
+                  <th>J</th>
+                  <th>K</th>
+                  <th>Ann Return</th>
+                  <th>Sharpe</th>
+                  <th>Max DD</th>
+                </tr>
+              </thead>
+              <tbody id="bestBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </main>
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

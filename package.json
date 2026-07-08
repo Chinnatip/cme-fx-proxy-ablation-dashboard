@@ -1,0 +1,18 @@
+{
+  "name": "cme-fx-proxy-ablation-dashboard",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Static dashboard for CME FX proxy MR/MOM ablation experiments.",
+  "scripts": {
+    "dev": "python3 -m http.server 8777",
+    "check": "node --check app.js"
+  },
+  "keywords": [
+    "fx",
+    "cme",
+    "dashboard",
+    "quant",
+    "ablation"
+  ],
+  "license": "UNLICENSED"
+}
