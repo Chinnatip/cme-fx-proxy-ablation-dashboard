@@ -126,6 +126,7 @@ function renderAll() {
   renderCoverage(run.coverage);
   renderBestTable();
   drawEquity(curve, candidate);
+  drawSignalTape(curve);
 }
 
 function renderVerdict(candidate, run) {
@@ -344,6 +345,109 @@ function drawEquity(curve, candidate) {
   ctx.fillText(String(curve[0].date).slice(0, 10), pad.left, height - 22);
   ctx.textAlign = "right";
   ctx.fillText(String(curve.at(-1).date).slice(0, 10), width - pad.right, height - 22);
+  ctx.textAlign = "left";
+}
+
+function drawSignalTape(curve) {
+  const canvas = document.getElementById("signalCanvas");
+  const ctx = canvas.getContext("2d");
+  const width = canvas.width;
+  const height = canvas.height;
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = "#07101b";
+  ctx.fillRect(0, 0, width, height);
+
+  const signalChip = document.getElementById("signalChip");
+  if (!curve.length) {
+    ctx.fillStyle = "#8190a4";
+    ctx.fillText("No signal data", 80, 80);
+    signalChip.textContent = "No signal data";
+    return;
+  }
+
+  const pad = { left: 64, right: 28, top: 26, bottom: 72 };
+  const returns = curve.map((point) => Number(point.net_return || 0));
+  const maxAbs = Math.max(...returns.map((value) => Math.abs(value)), 0.01);
+  const x = (idx) => pad.left + (idx / Math.max(curve.length - 1, 1)) * (width - pad.left - pad.right);
+  const zeroY = pad.top + (height - pad.top - pad.bottom) / 2;
+  const y = (value) => zeroY - (value / maxAbs) * ((height - pad.top - pad.bottom) / 2) * 0.88;
+  const barWidth = Math.max(3, Math.min(18, (width - pad.left - pad.right) / Math.max(curve.length, 1) * 0.56));
+
+  drawSignalGrid(ctx, width, height, pad, maxAbs, zeroY, y);
+
+  curve.forEach((point, idx) => {
+    const value = Number(point.net_return || 0);
+    const px = x(idx);
+    const py = y(value);
+    ctx.fillStyle = value >= 0 ? "rgba(32, 214, 159, 0.82)" : "rgba(255, 95, 122, 0.82)";
+    ctx.fillRect(px - barWidth / 2, Math.min(py, zeroY), barWidth, Math.max(2, Math.abs(zeroY - py)));
+
+    const previous = curve[idx - 1];
+    const changed =
+      !previous || previous.top_assets !== point.top_assets || previous.bottom_assets !== point.bottom_assets;
+    if (changed) {
+      ctx.beginPath();
+      ctx.arc(px, zeroY, 4.5, 0, Math.PI * 2);
+      ctx.fillStyle = "#63e6ff";
+      ctx.fill();
+    }
+  });
+
+  drawPositionLabels(ctx, curve, x, height, pad);
+
+  const latest = curve[curve.length - 1];
+  signalChip.textContent = `ล่าสุด Long ${latest.top_assets || "-"} / Short ${latest.bottom_assets || "-"}`;
+  ctx.fillStyle = "#8190a4";
+  ctx.font = "16px 'Noto Sans Thai'";
+  ctx.fillText("Net return per rebalance", pad.left, 20);
+  ctx.fillText(String(curve[0].date).slice(0, 10), pad.left, height - 20);
+  ctx.textAlign = "right";
+  ctx.fillText(String(curve[curve.length - 1].date).slice(0, 10), width - pad.right, height - 20);
+  ctx.textAlign = "left";
+}
+
+function drawSignalGrid(ctx, width, height, pad, maxAbs, zeroY, y) {
+  ctx.strokeStyle = "rgba(166, 184, 208, 0.12)";
+  ctx.lineWidth = 1;
+  ctx.font = "13px 'Noto Sans Thai'";
+  ctx.fillStyle = "#8190a4";
+
+  [-1, -0.5, 0, 0.5, 1].forEach((ratio) => {
+    const value = ratio * maxAbs;
+    const py = ratio === 0 ? zeroY : y(value);
+    ctx.beginPath();
+    ctx.moveTo(pad.left, py);
+    ctx.lineTo(width - pad.right, py);
+    ctx.stroke();
+    ctx.fillText(fmtPct(value), 12, py + 4);
+  });
+}
+
+function drawPositionLabels(ctx, curve, x, height, pad) {
+  const labelY = height - pad.bottom + 26;
+  ctx.font = "12px 'Noto Sans Thai'";
+  ctx.textAlign = "center";
+
+  const segments = [];
+  curve.forEach((point, idx) => {
+    const label = `L ${point.top_assets || "-"} / S ${point.bottom_assets || "-"}`;
+    const previous = segments[segments.length - 1];
+    if (previous && previous.label === label) {
+      previous.end = idx;
+    } else {
+      segments.push({ label, start: idx, end: idx });
+    }
+  });
+
+  segments.forEach((segment, idx) => {
+    if (idx % Math.max(1, Math.ceil(segments.length / 9)) !== 0 && segment.end - segment.start < 2) return;
+    const mid = (segment.start + segment.end) / 2;
+    const px = x(mid);
+    const text = segment.label.length > 18 ? `${segment.label.slice(0, 18)}...` : segment.label;
+    ctx.fillStyle = idx % 2 === 0 ? "#bad7ff" : "#aebbd0";
+    ctx.fillText(text, px, labelY + (idx % 2) * 18);
+  });
+
   ctx.textAlign = "left";
 }
 

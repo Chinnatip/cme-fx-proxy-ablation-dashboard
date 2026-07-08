@@ -297,6 +297,33 @@ canvas {
   background: #07101b;
 }
 
+.signal-panel {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.panel-head.compact {
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.panel-head.compact h3 {
+  margin: 3px 0 0;
+  font-size: 17px;
+}
+
+#signalCanvas {
+  border: 1px solid rgba(166, 184, 208, 0.1);
+}
+
+.signal-note {
+  margin: 10px 0 0;
+  color: #92a3ba;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
 .insight-panel p {
   color: #b5c1d3;
   line-height: 1.7;

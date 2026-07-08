@@ -11,6 +11,8 @@
 - `J`: lookback window หรือช่วงย้อนหลังที่ใช้สร้างคะแนน ranking
 - `K`: holding window หรือช่วงเวลาที่ถือ position หลังเลือก winner/loser
 
+ใต้ equity chart มี `Signal / Rebalance Tape` สำหรับดูพฤติกรรมของระบบในแต่ละรอบ rebalance ว่าระบบเลือก long/short asset อะไร และรอบนั้นทำกำไรหรือขาดทุนเท่าไร โมเดลนี้ไม่ได้มี take profit / cutloss ราย order โดยตรง จึงแสดงเป็น net return ต่อรอบแทน
+
 จุดสำคัญของรอบนี้คือทุก timeframe ถูกบังคับให้อยู่ใน common window เดียวกันให้มากที่สุด คือประมาณ `Feb 2024` ถึงข้อมูลล่าสุดที่ Yahoo Finance 1H source ให้ได้ เพื่อไม่ให้ daily data ได้เปรียบจาก history ที่ยาวกว่า intraday
 
 ## ไฟล์หลัก

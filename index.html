@@ -77,6 +77,19 @@
               <span class="chip" id="candidateChip">-</span>
             </div>
             <canvas id="equityCanvas" width="1200" height="560"></canvas>
+            <div class="signal-panel">
+              <div class="panel-head compact">
+                <div>
+                  <p class="eyebrow">Signal / Rebalance Tape</p>
+                  <h3>ระบบเลือก Long / Short ตอนไหน และรอบนั้นทำเงินหรือเสียเงิน</h3>
+                </div>
+                <span class="chip" id="signalChip">No TP/SL orders</span>
+              </div>
+              <canvas id="signalCanvas" width="1200" height="360"></canvas>
+              <p class="signal-note">
+                โมเดลนี้เป็น rotation/rebalance ไม่ได้จำลอง take profit หรือ cutloss ราย order โดยตรง กราฟนี้จึงแสดง net return ต่อรอบ พร้อม long/short asset ที่ระบบเลือกในรอบนั้น
+              </p>
+            </div>
           </article>
 
           <article class="panel insight-panel">
